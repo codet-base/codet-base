@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>codetbase - 개인 이미지 백업</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Pretendard', sans-serif; margin: 0; background-color: #f8f9fa; color: #3c4043; }
+        .container { max-width: 500px; margin: 20px auto; padding: 24px; background: white; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h2 { text-align: center; color: #1a73e8; margin-bottom: 24px; cursor: pointer; }
+        
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: relative; gap: 10px; }
+        .header-title { font-size: 18px; font-weight: bold; }
+        .profile-trigger { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px 14px; border-radius: 20px; background: #f1f3f4; border: none; font-size: 14px; max-width: 180px; overflow: hidden; }
+        
+        #profile-menu { display: none; position: absolute; top: 45px; right: 0; width: 180px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 2000; padding: 12px; border: 1px solid #eee; }
+        .menu-item { width: 100%; padding: 10px; text-align: left; font-size: 13px; background: none; border: none; cursor: pointer; border-radius: 6px; }
+
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .photo-item { cursor: pointer; border-radius: 12px; overflow: hidden; border: 1px solid #eee; aspect-ratio: 1/1; background: #f1f3f4; }
+        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+
+        .full-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        button { width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-share { background: #34a853; color: white; }
+        .btn-danger { background: #feeef0; color: #d93025; }
+        
+        /* 드래그 앤 드롭 영역 */
+        #drop-zone { border: 2px dashed #ddd; padding: 40px; text-align: center; border-radius: 12px; cursor: pointer; margin-bottom: 20px; color:#aaa; transition: all 0.2s; }
+        #drop-zone.dragover { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; transform: scale(1.02); }
+
+        .overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1500; }
+        .sub-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 350px; background: white; border-radius: 16px; padding: 20px; z-index: 2100; }
+        input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; }
+        
+        #link-container { display: none; width: 100%; max-width: 350px; margin-bottom: 10px; }
+        #mobile-guide { display: none; color: #fff; font-size: 13px; background: rgba(26, 115, 232, 0.8); padding: 8px 15px; border-radius: 20px; margin-bottom: 15px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 onclick="location.href=location.origin + location.pathname">codetbase</h2>
+    
+    <div id="auth-ui" style="display:none;">
+        <input type="email" id="email" placeholder="이메일">
+        <input type="password" id="password" placeholder="비밀번호">
+        <button class="btn-primary" onclick="handleSignIn()">로그인</button>
+        <button onclick="toggleSignUpView(true)">회원가입</button>
+        <div id="signup-fields" style="display:none; margin-top:10px;">
+            <input type="text" id="nickname" placeholder="닉네임">
+            <button class="btn-primary" onclick="handleSignUp()">가입 완료</button>
+        </div>
+    </div>
+
+    <div id="app-ui" style="display:none;">
+        <div class="header-bar">
+            <div class="header-title">나의 사진함</div>
+            <button class="profile-trigger" onclick="toggleProfileMenu(event)">
+                <span id="display-nickname">...</span>님 ▼
+            </button>
+            <div id="profile-menu">
+                <button class="menu-item" onclick="openEditNickname()">닉네임 변경</button>
+                <button class="menu-item" onclick="openEditEmail()">이메일 변경</button>
+                <button class="menu-item" onclick="openEditPassword()">비밀번호 변경</button>
+                <hr style="border:0; border-top:1px solid #eee; margin:5px 0;">
+                <button class="menu-item" onclick="handleSignOut()" style="color:#d93025;">로그아웃</button>
+            </div>
+        </div>
+        <div id="drop-zone">사진을 끌어당겨 업로드 (클릭 가능)</div>
+        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+        <div id="photo-list" class="photo-grid"></div>
+    </div>
+</div>
+
+<div id="modal" class="full-modal">
+    <span onclick="closeModal()" style="position:absolute; top:20px; right:25px; color:white; font-size:40px; cursor:pointer;">&times;</span>
+    <img id="modal-img" src="" style="max-width:100%; max-height:55%; border-radius:8px; margin-bottom:15px; object-fit:contain;">
+    <div id="mobile-guide">고화질의 사진을 위해 사진을 꾹 눌러서 저장해주세요</div>
+    <div style="flex-direction:column; width:100%; max-width:350px;">
+        <div id="link-container">
+            <input type="text" id="share-link-input" readonly style="background: #333; color: #fff; border: 1px solid #555; text-align: center;" onclick="this.select()">
+            <p style="color: #ccc; font-size: 11px; text-align: center; margin: 0 0 10px 0;">위 주소를 클릭해서 복사하세요</p>
+        </div>
+        <button onclick="showShareLink()" class="btn-share">공유하기</button>
+        <button id="pc-download-btn" onclick="triggerDownload()" class="btn-primary">다운로드</button>
+        <button onclick="deletePermanently()" class="btn-danger">삭제</button>
+    </div>
+</div>
+
+<div id="sub-overlay" class="overlay" onclick="closeSubModals()"></div>
+<div id="nickname-modal" class="sub-modal"><h3>닉네임 변경</h3><input type="text" id="new-nickname" placeholder="새 닉네임"><button class="btn-primary" onclick="updateNickname()">변경</button><button onclick="closeSubModals()">취소</button></div>
+<div id="email-modal" class="sub-modal"><h3>이메일 변경</h3><input type="email" id="new-email" placeholder="새 이메일"><button class="btn-primary" onclick="updateEmail()">변경</button><button onclick="closeSubModals()">취소</button></div>
+<div id="password-modal" class="sub-modal"><h3>비밀번호 변경</h3><input type="password" id="new-password" placeholder="새 비밀번호"><button class="btn-primary" onclick="updatePassword()">변경</button><button onclick="closeSubModals()">취소</button></div>
+
+<script>
+    const S_URL = 'https://utfrjzcnefsbuadnkdud.supabase.co';
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0ZnJqemNuZWZzYnVhZG5rZHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4MjE1MTYsImV4cCI6MjA4MjM5NzUxNn0.D3Za1nMw-x0JwOpkFuYceUHlagcpRdrpFqNUIP5Kjdc';
+    const client = supabase.createClient(S_URL, S_KEY, { auth: { persistSession: true, autoRefreshToken: true, storage: window.localStorage } });
+
+    let user = null, currentPhoto = null;
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    async function initApp() {
+        const { data: { session } } = await client.auth.getSession();
+        handleAuthState(session?.user);
+        client.auth.onAuthStateChange((_, session) => handleAuthState(session?.user));
+        initDragAndDrop();
+    }
+
+    // 드래그 앤 드롭 기능 초기화
+    function initDragAndDrop() {
+        const dz = document.getElementById('drop-zone');
+        dz.onclick = () => document.getElementById('file-input').click();
+
+        // 브라우저 기본 동작 방지
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+            dz.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); });
+        });
+
+        // 드래그 시각적 효과
+        dz.addEventListener('dragover', () => dz.classList.add('dragover'));
+        ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, () => dz.classList.remove('dragover')));
+
+        // 파일 드롭 시 업로드
+        dz.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) upload(files[0]);
+        });
+    }
+
+    async function upload(file) {
+        if(!file || !file.type.startsWith('image/')) return;
+        document.getElementById('drop-zone').innerText = "업로드 중...";
+        const secureFileName = Math.random().toString(36).substring(2, 15) + "_" + Date.now();
+        await client.storage.from('codet-img').upload(secureFileName, file);
+        const { data: { publicUrl } } = client.storage.from('codet-img').getPublicUrl(secureFileName);
+        await client.from('backups').insert([{ image_url: publicUrl, user_id: user.id, file_name: file.name, is_public: true }]);
+        document.getElementById('drop-zone').innerText = "사진을 끌어당겨 업로드 (클릭 가능)";
+        loadPhotos();
+    }
+
+    // --- 이하 기존 기능 동일하게 유지 ---
+    function handleAuthState(u) {
+        user = u;
+        if (u) {
+            document.getElementById('auth-ui').style.display = 'none';
+            document.getElementById('app-ui').style.display = 'block';
+            document.getElementById('display-nickname').innerText = u.user_metadata.nickname || "사용자";
+            loadPhotos();
+        } else {
+            document.getElementById('auth-ui').style.display = 'block';
+            document.getElementById('app-ui').style.display = 'none';
+        }
+    }
+
+    async function loadPhotos() {
+        if(!user) return;
+        const { data } = await client.from('backups').select('*').eq('user_id', user.id).order('created_at', {ascending: false});
+        document.getElementById('photo-list').innerHTML = (data||[]).map(p => `<div class="photo-item" onclick="openPhoto('${p.id}')"><img src="${p.image_url}"></div>`).join('');
+    }
+
+    function openPhoto(id) {
+        client.from('backups').select('*').eq('id', id).single().then(({data}) => {
+            currentPhoto = data;
+            document.getElementById('modal').style.display = 'flex';
+            document.getElementById('modal-img').src = data.image_url;
+            document.getElementById('link-container').style.display = 'none';
+            document.getElementById('share-link-input').value = data.image_url;
+            if (isMobile) { document.getElementById('mobile-guide').style.display = 'block'; document.getElementById('pc-download-btn').style.display = 'none'; }
+            else { document.getElementById('mobile-guide').style.display = 'none'; document.getElementById('pc-download-btn').style.display = 'block'; }
+        });
+    }
+
+    async function triggerDownload() {
+        const response = await fetch(currentPhoto.image_url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = currentPhoto.file_name || 'image.jpg'; a.click();
+    }
+
+    async function deletePermanently() { if(confirm("삭제할까요?")) { await client.from('backups').delete().eq('id', currentPhoto.id); closeModal(); loadPhotos(); } }
+    function showShareLink() { document.getElementById('link-container').style.display = 'block'; }
+    function closeSubModals() { document.querySelectorAll('.sub-modal, .overlay').forEach(el => el.style.display = 'none'); }
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    async function handleSignIn() { await client.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value }); }
+    async function handleSignUp() { await client.auth.signUp({ email: document.getElementById('email').value, password: document.getElementById('password').value, options: { data: { nickname: document.getElementById('nickname').value } } }); alert("가입 완료!"); }
+    async function handleSignOut() { await client.auth.signOut(); location.reload(); }
+    function toggleSignUpView(s) { document.getElementById('signup-fields').style.display = s?'block':'none'; }
+    function toggleProfileMenu(e) { e.stopPropagation(); const m = document.getElementById('profile-menu'); m.style.display = m.style.display==='block'?'none':'block'; }
+    function openEditNickname() { document.getElementById('sub-overlay').style.display='block'; document.getElementById('nickname-modal').style.display='block'; }
+    function openEditEmail() { document.getElementById('sub-overlay').style.display='block'; document.getElementById('email-modal').style.display='block'; }
+    function openEditPassword() { document.getElementById('sub-overlay').style.display='block'; document.getElementById('password-modal').style.display='block'; }
+    async function updateNickname() { await client.auth.updateUser({ data: { nickname: document.getElementById('new-nickname').value } }); location.reload(); }
+    async function updateEmail() { await client.auth.updateUser({ email: document.getElementById('new-email').value }); alert("확인 메일을 보냈습니다."); closeSubModals(); }
+    async function updatePassword() { await client.auth.updateUser({ password: document.getElementById('new-password').value }); alert("변경 완료"); closeSubModals(); }
+    function handleFileSelect(e) { if(e.target.files[0]) upload(e.target.files[0]); }
+    window.onclick = () => document.getElementById('profile-menu').style.display = 'none';
+
+    initApp();
+</script>
+</body>
+</html>
