@@ -22,7 +22,14 @@
         .photo-item { cursor: pointer; border-radius: 12px; overflow: hidden; border: 1px solid #eee; aspect-ratio: 1/1; background: #f1f3f4; }
         .photo-item img { width: 100%; height: 100%; object-fit: cover; }
 
+        /* 상세 모달 스타일 */
         .full-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        
+        /* 사진 정보 표시 영역 */
+        .photo-info { width: 100%; max-width: 350px; color: white; margin-bottom: 15px; text-align: left; }
+        .info-name { font-size: 16px; font-weight: bold; margin-bottom: 4px; color: #fff; }
+        .info-date { font-size: 12px; color: #aaa; }
+
         button { width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
         .btn-primary { background: #1a73e8; color: white; }
         .btn-share { background: #34a853; color: white; }
@@ -77,8 +84,16 @@
 
 <div id="modal" class="full-modal">
     <span onclick="closeModal()" style="position:absolute; top:20px; right:25px; color:white; font-size:40px; cursor:pointer;">&times;</span>
-    <img id="modal-img" src="" style="max-width:100%; max-height:55%; border-radius:8px; margin-bottom:15px; object-fit:contain;">
+    
+    <div class="photo-info">
+        <div id="modal-file-name" class="info-name">파일명.png</div>
+        <div id="modal-file-date" class="info-date">생성일: 0000.00.00</div>
+    </div>
+
+    <img id="modal-img" src="" style="max-width:100%; max-height:50%; border-radius:8px; margin-bottom:15px; object-fit:contain;">
+    
     <div id="mobile-guide">고화질의 사진을 위해 사진을 꾹 눌러서 저장해주세요</div>
+    
     <div style="flex-direction:column; width:100%; max-width:350px;">
         <div id="link-container">
             <input type="text" id="share-link-input" readonly style="background: #333; color: #fff; border: 1px solid #555; text-align: center; width:100%;" onclick="this.select()">
@@ -131,10 +146,23 @@
 
     async function upload(file) {
         if(!file || !file.type.startsWith('image/')) return;
+        
+        // 원본 파일 생성 날짜 (수정 날짜 사용)
+        const fileDate = new Date(file.lastModified).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        
         const secureFileName = Math.random().toString(36).substring(2, 15) + "_" + Date.now() + "_" + file.name;
         await client.storage.from('codet-img').upload(secureFileName, file);
         const { data: { publicUrl } } = client.storage.from('codet-img').getPublicUrl(secureFileName);
-        await client.from('backups').insert([{ image_url: publicUrl, user_id: user.id, file_name: file.name, is_public: true }]);
+        
+        // metadata 필드에 원본 생성 날짜 저장 (supabase 테이블에 metadata 컬럼이 없다면 file_name 등에 합쳐서 저장하거나 스키마 수정 필요)
+        // 여기서는 편의상 file_name 필드를 활용하거나 metadata(json) 필드가 있다고 가정하고 작성합니다.
+        await client.from('backups').insert([{ 
+            image_url: publicUrl, 
+            user_id: user.id, 
+            file_name: file.name, 
+            is_public: true,
+            description: fileDate // description 필드에 생성 날짜 임시 저장
+        }]);
         loadPhotos();
     }
 
@@ -143,41 +171,52 @@
             currentPhoto = data;
             document.getElementById('modal').style.display = 'flex';
             document.getElementById('modal-img').src = data.image_url;
+            
+            // 정보 표시
+            document.getElementById('modal-file-name').innerText = data.file_name || "알 수 없는 파일";
+            document.getElementById('modal-file-date').innerText = "생성: " + (data.description || "정보 없음");
+            
             document.getElementById('link-container').style.display = 'none';
             document.getElementById('share-link-input').value = data.image_url;
-            if (isMobile) { document.getElementById('mobile-guide').style.display = 'block'; document.getElementById('pc-download-btn').style.display = 'none'; }
-            else { document.getElementById('mobile-guide').style.display = 'none'; document.getElementById('pc-download-btn').style.display = 'block'; }
+            
+            if (isMobile) { 
+                document.getElementById('mobile-guide').style.display = 'block'; 
+                document.getElementById('pc-download-btn').style.display = 'none'; 
+            } else { 
+                document.getElementById('mobile-guide').style.display = 'none'; 
+                document.getElementById('pc-download-btn').style.display = 'block'; 
+            }
         });
     }
 
     async function triggerDownload() {
         if(!currentPhoto) return;
         try {
-            // 원본 파일 데이터 가져오기
             const response = await fetch(currentPhoto.image_url);
             const blob = await response.blob();
-            
-            // 임시 URL 생성 및 다운로드 실행
             const url = window.URL.createObjectURL(blob);
+            
+            // 파일 이름 뒤에 -codetbase 추가
+            const originalName = currentPhoto.file_name || 'image.jpg';
+            const nameParts = originalName.split('.');
+            const extension = nameParts.pop();
+            const newFileName = nameParts.join('.') + '-codetbase.' + extension;
+
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            // DB에 저장된 원래 파일명을 사용하거나, 없으면 기본값 사용
-            a.download = currentPhoto.file_name || 'codetbase_image.jpg'; 
+            a.download = newFileName; 
             document.body.appendChild(a);
             a.click();
             
-            // 정리
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
         } catch (error) {
-            console.error("다운로드 중 오류:", error);
-            // 실패 시 최후의 수단으로 새 창 열기
             window.open(currentPhoto.image_url, '_blank');
         }
     }
 
-    // --- 기타 기존 로직 유지 ---
+    // --- 기본 기능 유지 ---
     function initDragAndDrop() {
         const dz = document.getElementById('drop-zone');
         dz.onclick = () => document.getElementById('file-input').click();
