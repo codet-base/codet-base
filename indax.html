@@ -7,249 +7,307 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Pretendard', sans-serif; margin: 0; background-color: #f8f9fa; color: #3c4043; }
-        .container { max-width: 500px; margin: 20px auto; padding: 24px; background: white; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h2 { text-align: center; color: #1a73e8; margin-bottom: 24px; cursor: pointer; }
-        
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: relative; gap: 10px; }
-        .header-title { font-size: 18px; font-weight: bold; }
-        .profile-trigger { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 8px 14px; border-radius: 20px; background: #f1f3f4; border: none; font-size: 14px; max-width: 180px; overflow: hidden; }
-        
-        #profile-menu { display: none; position: absolute; top: 45px; right: 0; width: 180px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 2000; padding: 12px; border: 1px solid #eee; }
-        .menu-item { width: 100%; padding: 10px; text-align: left; font-size: 13px; background: none; border: none; cursor: pointer; border-radius: 6px; }
+        body { font-family: 'Pretendard', sans-serif; margin: 0; background-color: #f4f7f9; color: #1c1e21; }
+        .container { max-width: 500px; margin: 40px auto; padding: 24px; background: white; border-radius: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); }
+        h2 { text-align: center; color: #1a73e8; margin-bottom: 10px; cursor: pointer; font-weight: 800; font-size: 28px; letter-spacing: -0.5px; }
 
-        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .photo-item { cursor: pointer; border-radius: 12px; overflow: hidden; border: 1px solid #eee; aspect-ratio: 1/1; background: #f1f3f4; }
+        .usage-container { margin-bottom: 25px; padding: 0 5px; }
+        .usage-info { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #5f6368; margin-bottom: 6px; }
+        .usage-bar-bg { width: 100%; height: 12px; background: #dae0e5; border-radius: 6px; overflow: hidden; position: relative; border: 1px solid #cfd4d9; }
+        #usage-bar-fill { height: 100%; background: #1a73e8; border-radius: 6px; width: 0%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); position: absolute; left: 0; top: 0; }
+
+        .share-card { display: none; flex-direction: column; align-items: center; gap: 20px; }
+        .share-owner { background: #f8f9fa; width: 100%; padding: 10px; border-radius: 8px; font-size: 13px; color: #5f6368; text-align: center; font-weight: 600; }
+        .share-img-box { width: 100%; background: #fff; border: 1px solid #eee; border-radius: 16px; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 200px; }
+        .share-img-box img { max-width: 100%; border-radius: 8px; object-fit: contain; }
+        
+        .btn-full { width: 100%; padding: 16px; border-radius: 12px; border: none; font-weight: 700; font-size: 15px; cursor: pointer; }
+        .btn-blue { background: #1a73e8; color: white; }
+        .btn-gray { background: #f1f3f4; color: #3c4043; margin-top: -10px; }
+
+        .auth-form { display: flex; flex-direction: column; gap: 12px; }
+        .auth-form input { width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid #dadce0; font-size: 15px; outline: none; }
+        .btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #1a73e8; color: white; font-weight: 700; cursor: pointer; margin-top: 8px; }
+        .btn-secondary { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #dadce0; background: white; color: #5f6368; font-weight: 700; cursor: pointer; }
+
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 12px 16px; background: #f8f9fa; border-radius: 16px; gap: 8px; }
+        .header-title { font-weight: 700; font-size: 15px; color: #5f6368; white-space: nowrap; }
+        .header-actions { display: flex; align-items: center; gap: 6px; justify-content: flex-end; flex-grow: 1; }
+        .profile-trigger { cursor: pointer; padding: 6px 12px; border-radius: 20px; background: white; border: 1px solid #dadce0; font-size: 12px; font-weight: 600; color: #1a73e8; }
+        .btn-delete-mode.active { background: #feeef0; border-color: #fecaca; color: #d93025; }
+        .btn-upgrade { color: #188038; border-color: #ceead6; }
+
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 15px; }
+        .photo-item { cursor: pointer; border-radius: 16px; overflow: hidden; aspect-ratio: 1/1; background: #eee; position: relative; border: 3px solid transparent; }
         .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-item.selected { border: 4px solid #d93025; }
 
-        /* 상세 모달 스타일 */
-        .full-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
-        
-        /* 사진 정보 표시 상단 바 */
-        .photo-header { width: 100%; max-width: 400px; background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.1); }
-        .info-name { font-size: 15px; font-weight: 600; color: #ffffff; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .info-date { font-size: 12px; color: #cccccc; }
+        #drop-zone { border: 2px dashed #cbd5e0; padding: 40px 20px; text-align: center; border-radius: 20px; cursor: pointer; color: #718096; margin-bottom: 15px; background: #fff; transition: background 0.2s; }
+        #drop-zone:hover { background: #f8f9fa; }
+        .drop-hint { font-size: 12px; color: #9aa0a6; margin-top: 8px; display: block; font-weight: 500; }
 
-        button { width: 100%; padding: 14px; margin-bottom: 8px; border-radius: 10px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
-        .btn-primary { background: #1a73e8; color: white; }
-        .btn-share { background: #34a853; color: white; }
-        .btn-danger { background: #feeef0; color: #d93025; }
+        #upload-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 3000; flex-direction: column; justify-content: center; align-items: center; color: white; }
         
-        #drop-zone { border: 2px dashed #ddd; padding: 40px; text-align: center; border-radius: 12px; cursor: pointer; margin-bottom: 20px; color:#aaa; transition: all 0.2s; }
-        #drop-zone.dragover { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; transform: scale(1.02); }
-
-        .overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1500; }
-        .sub-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; max-width: 350px; background: white; border-radius: 16px; padding: 20px; z-index: 2100; }
-        input { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ddd; }
-        
-        #link-container { display: none; width: 100%; max-width: 350px; margin-bottom: 10px; }
-        #mobile-guide { display: none; color: #fff; font-size: 13px; background: rgba(26, 115, 232, 0.8); padding: 8px 15px; border-radius: 20px; margin-bottom: 15px; text-align: center; }
+        .full-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        #modal-img { max-width: 95%; max-height: 70%; width: auto; height: auto; border-radius: 12px; margin-bottom: 15px; object-fit: contain; }
+        .photo-detail-info { color: #ccc; font-size: 13px; margin-bottom: 10px; text-align: center; }
     </style>
 </head>
 <body>
 
+<div id="upload-overlay">
+    <div id="upload-status" style="font-weight: 700; font-size: 18px; margin-bottom: 10px;">전송 중</div>
+    <div id="upload-info">파일을 안전하게 저장하고 있습니다.</div>
+</div>
+
 <div class="container">
-    <h2 onclick="location.href=location.origin + location.pathname">codetbase</h2>
+    <h2 onclick="location.href='index.html'">codetbase</h2>
     
-    <div id="auth-ui" style="display:none;">
-        <input type="email" id="email" placeholder="이메일">
-        <input type="password" id="password" placeholder="비밀번호">
-        <button class="btn-primary" onclick="handleSignIn()">로그인</button>
-        <button onclick="toggleSignUpView(true)">회원가입</button>
-        <div id="signup-fields" style="display:none; margin-top:10px;">
-            <input type="text" id="nickname" placeholder="닉네임">
-            <button class="btn-primary" onclick="handleSignUp()">가입 완료</button>
+    <div id="usage-ui" class="usage-container" style="display:none;">
+        <div class="usage-info">
+            <span>저장 공간 사용량</span>
+            <span id="usage-text">0MB / 200MB</span>
         </div>
+        <div class="usage-bar-bg">
+            <div id="usage-bar-fill"></div>
+        </div>
+    </div>
+
+    <div id="share-ui" class="share-card">
+        <div id="share-owner-info" class="share-owner">공유자 정보 로딩 중</div>
+        <div class="share-img-box"><img id="share-img" src="" alt="공유 이미지"></div>
+        <button onclick="triggerDownload()" class="btn-full btn-blue">사진 다운로드</button>
+        <button onclick="location.href='index.html'" class="btn-full btn-gray">나도 이미지 백업하기</button>
+    </div>
+
+    <div id="auth-ui" class="auth-form" style="display:none;">
+        <input type="email" id="auth-email" placeholder="이메일 주소">
+        <input type="password" id="auth-pw" placeholder="비밀번호">
+        <button onclick="handleAuth('signIn')" class="btn-primary">로그인</button>
+        <button onclick="handleAuth('signUp')" class="btn-secondary">회원가입</button>
     </div>
 
     <div id="app-ui" style="display:none;">
         <div class="header-bar">
-            <div class="header-title">나 의 사진함</div>
-            <button class="profile-trigger" onclick="toggleProfileMenu(event)">
-                <span id="display-nickname">...</span>님 ▼
-            </button>
-            <div id="profile-menu">
-                <button class="menu-item" onclick="openEditNickname()">닉네임 변경</button>
-                <button class="menu-item" onclick="openEditEmail()">이메일 변경</button>
-                <button class="menu-item" onclick="openEditPassword()">비밀번호 변경</button>
-                <hr style="border:0; border-top:1px solid #eee; margin:5px 0;">
-                <button class="menu-item" onclick="handleSignOut()" style="color:#d93025;">로그아웃</button>
+            <div class="header-title">나의 사진함</div>
+            <div class="header-actions">
+                <button id="select-mode-btn" class="profile-trigger btn-delete-mode" onclick="toggleSelectMode()">선택 삭제</button>
+                <button class="profile-trigger btn-upgrade" onclick="upgradeCapacity()">용량 추가</button>
+                <button class="profile-trigger" onclick="toggleProfileMenu(event)">
+                    <span id="display-email">사용자</span>
+                </button>
+            </div>
+            <div id="profile-menu" style="display:none; position:absolute; top:52px; right:16px; width:130px; background:white; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); z-index:2000; padding:6px; border:1px solid #eee;">
+                <button onclick="handleSignOut()" style="width:100%; padding:10px; border:none; background:none; color:#d93025; font-weight:700; cursor:pointer;">로그아웃</button>
             </div>
         </div>
-        <div id="drop-zone">사진을 끌어당겨 업로드 (클릭 가능)</div>
-        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelect(event)">
+        
+        <div id="drop-zone">
+            <div style="font-weight: 700;">사진을 선택하거나 끌어다 놓으세요</div>
+            <span class="drop-hint">(장당 최대 용량: 50MB)</span>
+        </div>
+        
+        <input type="file" id="file-input" style="display:none;" onchange="handleFileSelect(event)">
         <div id="photo-list" class="photo-grid"></div>
     </div>
 </div>
 
 <div id="modal" class="full-modal">
     <span onclick="closeModal()" style="position:absolute; top:20px; right:25px; color:white; font-size:40px; cursor:pointer;">&times;</span>
-    
-    <div class="photo-header">
-        <div id="modal-file-name" class="info-name">데이터를 불러오는 중...</div>
-        <div id="modal-file-date" class="info-date">날짜 정보 없음</div>
-    </div>
-
-    <img id="modal-img" src="" style="max-width:100%; max-height:55%; border-radius:8px; margin-bottom:15px; object-fit:contain;">
-    
-    <div id="mobile-guide">고화질의 사진을 위해 사진을 꾹 눌러서 저장해주세요</div>
-    
-    <div style="flex-direction:column; width:100%; max-width:400px;">
-        <div id="link-container">
-            <input type="text" id="share-link-input" readonly style="background: #333; color: #fff; border: 1px solid #555; text-align: center; width:100%; padding: 10px; border-radius: 8px;" onclick="this.select()">
-            <p style="color: #ccc; font-size: 11px; text-align: center; margin: 5px 0 10px 0;">위 주소를 클릭해서 복사하세요</p>
-        </div>
-        <button onclick="showShareLink()" class="btn-share">공유하기</button>
-        <button id="pc-download-btn" onclick="triggerDownload()" class="btn-primary">다운로드</button>
-        <button onclick="deletePermanently()" class="btn-danger">삭제</button>
+    <img id="modal-img">
+    <div id="photo-name-size" class="photo-detail-info"></div>
+    <div style="width:100%; max-width:400px;">
+        <input type="text" id="share-link-input" readonly style="width:100%; padding:12px; border-radius:10px; background:#222; color:#fff; border:none; text-align:center; margin-bottom:10px;" onclick="this.select()">
+        <button onclick="triggerDownload()" class="btn-primary" style="margin:0">다운로드</button>
+        <button id="delete-btn" onclick="deleteSingle()" class="btn-secondary" style="margin-top:8px; background:#feeef0; color:#d93025; border:none;">삭제</button>
     </div>
 </div>
-
-<div id="sub-overlay" class="overlay" onclick="closeSubModals()"></div>
-<div id="nickname-modal" class="sub-modal"><h3>닉네임 변경</h3><input type="text" id="new-nickname" placeholder="새 닉네임"><button class="btn-primary" onclick="updateNickname()">변경</button><button onclick="closeSubModals()">취소</button></div>
-<div id="email-modal" class="sub-modal"><h3>이메일 변경</h3><input type="email" id="new-email" placeholder="새 이메일"><button class="btn-primary" onclick="updateEmail()">변경</button><button onclick="closeSubModals()">취소</button></div>
-<div id="password-modal" class="sub-modal"><h3>비밀번호 변경</h3><input type="password" id="new-password" placeholder="새 비밀번호"><button class="btn-primary" onclick="updatePassword()">변경</button><button onclick="closeSubModals()">취소</button></div>
 
 <script>
     const S_URL = 'https://utfrjzcnefsbuadnkdud.supabase.co';
     const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0ZnJqemNuZWZzYnVhZG5rZHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY4MjE1MTYsImV4cCI6MjA4MjM5NzUxNn0.D3Za1nMw-x0JwOpkFuYceUHlagcpRdrpFqNUIP5Kjdc';
-    const client = supabase.createClient(S_URL, S_KEY, { auth: { persistSession: true, autoRefreshToken: true, storage: window.localStorage } });
+    const client = supabase.createClient(S_URL, S_KEY);
 
-    let user = null, currentPhoto = null;
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    let user = null, currentPhoto = null, isSelectMode = false, selectedIds = new Set();
+    let totalUsedBytes = 0;
+    const MAX_CAPACITY = 200 * 1024 * 1024; // 200MB 제한
+    const MAX_SINGLE_FILE = 50 * 1024 * 1024;
 
-    async function initApp() {
+    async function init() {
         const { data: { session } } = await client.auth.getSession();
-        handleAuthState(session?.user);
-        client.auth.onAuthStateChange((_, session) => handleAuthState(session?.user));
+        user = session?.user;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('share')) { await loadSharePage(params.get('share').replace('189247', '')); } else { renderUI(); }
+        
+        client.auth.onAuthStateChange((event, session) => {
+            user = session?.user;
+            if (!new URLSearchParams(window.location.search).get('share')) renderUI();
+        });
         initDragAndDrop();
     }
 
-    function handleAuthState(u) {
-        user = u;
-        if (u) {
-            document.getElementById('auth-ui').style.display = 'none';
-            document.getElementById('app-ui').style.display = 'block';
-            document.getElementById('display-nickname').innerText = u.user_metadata.nickname || "사용자";
+    async function updateUsageGauge() {
+        if (!user) return;
+        const { data } = await client.from('backups').select('file_size').eq('user_id', user.id);
+        totalUsedBytes = (data || []).reduce((acc, curr) => acc + (Number(curr.file_size) || 0), 0);
+        
+        const usedMB = (totalUsedBytes / (1024 * 1024)).toFixed(1);
+        const percent = Math.min((totalUsedBytes / MAX_CAPACITY) * 100, 100);
+        
+        document.getElementById('usage-ui').style.display = 'block';
+        document.getElementById('usage-text').innerText = `${usedMB}MB / 200MB`;
+        
+        const fill = document.getElementById('usage-bar-fill');
+        fill.style.width = (percent > 0 && percent < 1) ? "1%" : percent + "%";
+        
+        if (percent > 90) fill.style.background = "#d93025"; 
+        else if (percent > 70) fill.style.background = "#f9ab00";
+        else fill.style.background = "#1a73e8";
+    }
+
+    async function handleFileSelect(e) {
+        const file = e.target.files[0]; if (!file) return;
+        if (file.size > MAX_SINGLE_FILE) { alert("사진 1장당 최대 50MB까지만 업로드 가능합니다."); return; }
+        if (totalUsedBytes + file.size > MAX_CAPACITY) { alert("저장 공간이 부족합니다."); return; }
+
+        const overlay = document.getElementById('upload-overlay');
+        overlay.style.display = 'flex';
+        
+        const fileExt = file.name.split('.').pop();
+        const safeFileName = Date.now() + "_" + Math.floor(Math.random()*1000) + "." + fileExt;
+        const path = user.id + "/" + safeFileName;
+        
+        try {
+            const { error: uploadError } = await client.storage.from('codet-img').upload(path, file);
+            if(uploadError) throw uploadError;
+            const { data: { publicUrl } } = client.storage.from('codet-img').getPublicUrl(path);
+            
+            await client.from('backups').insert([{ 
+                image_url: publicUrl, 
+                user_id: user.id, 
+                file_name: file.name,
+                file_size: file.size, 
+                user_email: user.email 
+            }]);
+            overlay.style.display = 'none'; 
             loadPhotos();
-        } else {
-            document.getElementById('auth-ui').style.display = 'block';
-            document.getElementById('app-ui').style.display = 'none';
+        } catch (err) {
+            alert("업로드 중 오류가 발생했습니다.");
+            overlay.style.display = 'none';
         }
     }
 
     async function loadPhotos() {
         if(!user) return;
         const { data } = await client.from('backups').select('*').eq('user_id', user.id).order('created_at', {ascending: false});
-        document.getElementById('photo-list').innerHTML = (data||[]).map(p => `<div class="photo-item" onclick="openPhoto('${p.id}')"><img src="${p.image_url}"></div>`).join('');
+        document.getElementById('photo-list').innerHTML = (data||[]).map(p => `
+            <div class="photo-item" id="photo-${p.id}" onclick="handlePhotoClick('${p.id}')">
+                <img src="${p.image_url}" loading="lazy">
+            </div>
+        `).join('');
+        updateUsageGauge();
     }
 
-    async function upload(file) {
-        if(!file || !file.type.startsWith('image/')) return;
-        
-        // 원본 파일 생성/수정 날짜
-        const fileDate = new Date(file.lastModified).toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-        const secureFileName = Math.random().toString(36).substring(2, 15) + "_" + Date.now() + "_" + file.name;
-        
-        await client.storage.from('codet-img').upload(secureFileName, file);
-        const { data: { publicUrl } } = client.storage.from('codet-img').getPublicUrl(secureFileName);
-        
-        // description 필드에 사진 생성 날짜를 저장
-        await client.from('backups').insert([{ 
-            image_url: publicUrl, 
-            user_id: user.id, 
-            file_name: file.name, 
-            is_public: true,
-            description: fileDate
-        }]);
-        loadPhotos();
-    }
-
-    function openPhoto(id) {
-        client.from('backups').select('*').eq('id', id).single().then(({data}) => {
-            currentPhoto = data;
-            document.getElementById('modal').style.display = 'flex';
-            document.getElementById('modal-img').src = data.image_url;
-            
-            // 파일명 표시 (데이터가 없으면 URL에서 추출)
-            let displayFileName = data.file_name;
-            if(!displayFileName) {
-                const urlParts = data.image_url.split('/');
-                displayFileName = decodeURIComponent(urlParts[urlParts.length - 1].split('_').pop());
-            }
-            
-            document.getElementById('modal-file-name').innerText = displayFileName;
-            document.getElementById('modal-file-date').innerText = "생성: " + (data.description || "날짜 정보 없음");
-            
-            document.getElementById('link-container').style.display = 'none';
-            document.getElementById('share-link-input').value = data.image_url;
-            
-            if (isMobile) { 
-                document.getElementById('mobile-guide').style.display = 'block'; 
-                document.getElementById('pc-download-btn').style.display = 'none'; 
-            } else { 
-                document.getElementById('mobile-guide').style.display = 'none'; 
-                document.getElementById('pc-download-btn').style.display = 'block'; 
-            }
-        });
-    }
-
-    async function triggerDownload() {
-        if(!currentPhoto) return;
-        try {
-            const response = await fetch(currentPhoto.image_url);
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            
-            // 기존 파일명 확보 및 -codetbase 추가
-            let originalName = currentPhoto.file_name || 'image.jpg';
-            const nameParts = originalName.split('.');
-            const extension = nameParts.length > 1 ? nameParts.pop() : 'jpg';
-            const baseName = nameParts.join('.');
-            const newFileName = (baseName || 'codetbase_photo') + '-codetbase.' + extension;
-
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = newFileName; 
-            document.body.appendChild(a);
-            a.click();
-            
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        } catch (error) {
-            window.open(currentPhoto.image_url, '_blank');
+    function handlePhotoClick(id) {
+        if (isSelectMode) {
+            const el = document.getElementById("photo-" + id);
+            if (selectedIds.has(id)) { selectedIds.delete(id); el.classList.remove('selected'); }
+            else { selectedIds.add(id); el.classList.add('selected'); }
+            document.getElementById('select-mode-btn').innerText = `삭제 (${selectedIds.size})`;
+        } else {
+            client.from('backups').select('*').eq('id', id).single().then(({data}) => {
+                currentPhoto = data;
+                document.getElementById('modal').style.display = 'flex';
+                document.getElementById('modal-img').src = data.image_url;
+                
+                // [수정] 깃허브 도메인 공유 주소 반영
+                document.getElementById('share-link-input').value = "https://codet-base.github.io/codet-base/indax.html?share=" + data.id + "189247";
+                
+                const sizeStr = data.file_size > 1024 * 1024 ? (data.file_size / (1024 * 1024)).toFixed(2) + " MB" : (data.file_size / 1024).toFixed(2) + " KB";
+                document.getElementById('photo-name-size').innerText = `${data.file_name} (${sizeStr})`;
+            });
         }
     }
 
-    // --- 기타 UI 관리 로직 ---
-    function initDragAndDrop() {
-        const dz = document.getElementById('drop-zone');
-        dz.onclick = () => document.getElementById('file-input').click();
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-        dz.addEventListener('dragover', () => dz.classList.add('dragover'));
-        dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
-        dz.addEventListener('drop', e => { dz.classList.remove('dragover'); if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]); });
+    function upgradeCapacity() {
+        const code = prompt("용량 업그레이드 코드를 입력해주세요.");
+        if (code) alert("준비 중인 기능입니다.");
     }
-    async function deletePermanently() { if(confirm("삭제할까요?")) { await client.from('backups').delete().eq('id', currentPhoto.id); closeModal(); loadPhotos(); } }
-    function showShareLink() { document.getElementById('link-container').style.display = 'block'; }
-    function closeSubModals() { document.querySelectorAll('.sub-modal, .overlay').forEach(el => el.style.display = 'none'); }
-    function closeModal() { document.getElementById('modal').style.display = 'none'; }
-    async function handleSignIn() { await client.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value }); }
-    async function handleSignUp() { await client.auth.signUp({ email: document.getElementById('email').value, password: document.getElementById('password').value, options: { data: { nickname: document.getElementById('nickname').value } } }); alert("가입 완료!"); }
-    async function handleSignOut() { await client.auth.signOut(); location.reload(); }
-    function toggleSignUpView(s) { document.getElementById('signup-fields').style.display = s?'block':'none'; }
-    function toggleProfileMenu(e) { e.stopPropagation(); const m = document.getElementById('profile-menu'); m.style.display = m.style.display==='block'?'none':'block'; }
-    function openEditNickname() { document.getElementById('sub-overlay').style.display='block'; document.getElementById('nickname-modal').style.display='block'; }
-    function openEditEmail() { document.getElementById('sub-overlay').style.display='block'; document.getElementById('email-modal').style.display='block'; }
-    function openEditPassword() { document.getElementById('sub-overlay').style.display='block'; document.getElementById('password-modal').style.display='block'; }
-    async function updateNickname() { await client.auth.updateUser({ data: { nickname: document.getElementById('new-nickname').value } }); location.reload(); }
-    async function updateEmail() { await client.auth.updateUser({ email: document.getElementById('new-email').value }); alert("확인 메일을 보냈습니다."); closeSubModals(); }
-    async function updatePassword() { await client.auth.updateUser({ password: document.getElementById('new-password').value }); alert("변경 완료"); closeSubModals(); }
-    function handleFileSelect(e) { if(e.target.files[0]) upload(e.target.files[0]); }
-    window.onclick = () => document.getElementById('profile-menu').style.display = 'none';
 
-    initApp();
+    async function triggerDownload() {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) alert("사진을 길게 눌러 기기에 저장해주세요.");
+        else {
+            try {
+                const res = await fetch(currentPhoto.image_url);
+                const blob = await res.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = currentPhoto.file_name;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            } catch (e) { window.open(currentPhoto.image_url, '_blank'); }
+        }
+    }
+
+    function renderUI() {
+        if (new URLSearchParams(window.location.search).get('share')) return;
+        document.getElementById('auth-ui').style.display = user ? 'none' : 'flex';
+        document.getElementById('app-ui').style.display = user ? 'block' : 'none';
+        if(user) { 
+            document.getElementById('display-email').innerText = user.email.split('@')[0]; 
+            loadPhotos();
+        } else { document.getElementById('usage-ui').style.display = 'none'; }
+    }
+
+    async function loadSharePage(id) {
+        const { data, error } = await client.from('backups').select('*').eq('id', id).single();
+        if (error || !data) {
+            document.getElementById('share-ui').style.display = 'flex';
+            document.querySelector('.share-img-box').innerHTML = "<p>삭제된 이미지입니다.</p>"; return;
+        }
+        currentPhoto = data;
+        document.getElementById('share-ui').style.display = 'flex';
+        document.getElementById('share-owner-info').innerText = `공유자: ${data.user_email}`;
+        document.getElementById('share-img').src = data.image_url;
+    }
+
+    function toggleSelectMode() {
+        const btn = document.getElementById('select-mode-btn');
+        if (!isSelectMode) { isSelectMode = true; btn.innerText = "삭제 실행 (0)"; btn.classList.add('active'); } 
+        else { if (selectedIds.size === 0) { exitSelectMode(); return; } executeBulkDelete(); }
+    }
+
+    async function executeBulkDelete() {
+        if (!confirm(`${selectedIds.size}개를 삭제할까요?`)) return;
+        await client.from('backups').delete().in('id', Array.from(selectedIds));
+        exitSelectMode(); loadPhotos();
+    }
+
+    function exitSelectMode() {
+        isSelectMode = false; selectedIds.clear();
+        const btn = document.getElementById('select-mode-btn');
+        btn.innerText = "선택 삭제"; btn.classList.remove('active');
+        document.querySelectorAll('.photo-item').forEach(el => el.classList.remove('selected'));
+    }
+
+    async function handleAuth(type) {
+        const email = document.getElementById('auth-email').value;
+        const pw = document.getElementById('auth-pw').value;
+        if (type === 'signUp') {
+            const { error } = await client.auth.signUp({email, password:pw});
+            if(error) alert("실패: " + error.message); else alert("이메일 인증 링크를 확인해주세요.");
+        } else {
+            const { error } = await client.auth.signInWithPassword({email, password:pw});
+            if(error) alert("실패: " + error.message); else alert("로그인되었습니다.");
+        }
+    }
+
+    async function handleSignOut() { await client.auth.signOut(); location.reload(); }
+    async function deleteSingle() { if (!confirm("삭제할까요?")) return; await client.from('backups').delete().eq('id', currentPhoto.id); closeModal(); loadPhotos(); }
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
+    function toggleProfileMenu(e) { e.stopPropagation(); const m = document.getElementById('profile-menu'); m.style.display = m.style.display==='block'?'none':'block'; }
+    function initDragAndDrop() { const dz = document.getElementById('drop-zone'); dz.onclick = () => document.getElementById('file-input').click(); dz.ondragover = e => e.preventDefault(); dz.ondrop = e => { e.preventDefault(); handleFileSelect({target: {files: e.dataTransfer.files}}); }; }
+    init();
 </script>
 </body>
 </html>
