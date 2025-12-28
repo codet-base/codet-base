@@ -28,7 +28,6 @@
         .btn-share { background: #34a853; color: white; }
         .btn-danger { background: #feeef0; color: #d93025; }
         
-        /* 드래그 앤 드롭 영역 */
         #drop-zone { border: 2px dashed #ddd; padding: 40px; text-align: center; border-radius: 12px; cursor: pointer; margin-bottom: 20px; color:#aaa; transition: all 0.2s; }
         #drop-zone.dragover { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; transform: scale(1.02); }
 
@@ -82,8 +81,8 @@
     <div id="mobile-guide">고화질의 사진을 위해 사진을 꾹 눌러서 저장해주세요</div>
     <div style="flex-direction:column; width:100%; max-width:350px;">
         <div id="link-container">
-            <input type="text" id="share-link-input" readonly style="background: #333; color: #fff; border: 1px solid #555; text-align: center;" onclick="this.select()">
-            <p style="color: #ccc; font-size: 11px; text-align: center; margin: 0 0 10px 0;">위 주소를 클릭해서 복사하세요</p>
+            <input type="text" id="share-link-input" readonly style="background: #333; color: #fff; border: 1px solid #555; text-align: center; width:100%;" onclick="this.select()">
+            <p style="color: #ccc; font-size: 11px; text-align: center; margin: 5px 0 10px 0;">위 주소를 클릭해서 복사하세요</p>
         </div>
         <button onclick="showShareLink()" class="btn-share">공유하기</button>
         <button id="pc-download-btn" onclick="triggerDownload()" class="btn-primary">다운로드</button>
@@ -111,39 +110,6 @@
         initDragAndDrop();
     }
 
-    // 드래그 앤 드롭 기능 초기화
-    function initDragAndDrop() {
-        const dz = document.getElementById('drop-zone');
-        dz.onclick = () => document.getElementById('file-input').click();
-
-        // 브라우저 기본 동작 방지
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
-            dz.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); });
-        });
-
-        // 드래그 시각적 효과
-        dz.addEventListener('dragover', () => dz.classList.add('dragover'));
-        ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, () => dz.classList.remove('dragover')));
-
-        // 파일 드롭 시 업로드
-        dz.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) upload(files[0]);
-        });
-    }
-
-    async function upload(file) {
-        if(!file || !file.type.startsWith('image/')) return;
-        document.getElementById('drop-zone').innerText = "업로드 중...";
-        const secureFileName = Math.random().toString(36).substring(2, 15) + "_" + Date.now();
-        await client.storage.from('codet-img').upload(secureFileName, file);
-        const { data: { publicUrl } } = client.storage.from('codet-img').getPublicUrl(secureFileName);
-        await client.from('backups').insert([{ image_url: publicUrl, user_id: user.id, file_name: file.name, is_public: true }]);
-        document.getElementById('drop-zone').innerText = "사진을 끌어당겨 업로드 (클릭 가능)";
-        loadPhotos();
-    }
-
-    // --- 이하 기존 기능 동일하게 유지 ---
     function handleAuthState(u) {
         user = u;
         if (u) {
@@ -163,6 +129,15 @@
         document.getElementById('photo-list').innerHTML = (data||[]).map(p => `<div class="photo-item" onclick="openPhoto('${p.id}')"><img src="${p.image_url}"></div>`).join('');
     }
 
+    async function upload(file) {
+        if(!file || !file.type.startsWith('image/')) return;
+        const secureFileName = Math.random().toString(36).substring(2, 15) + "_" + Date.now() + "_" + file.name;
+        await client.storage.from('codet-img').upload(secureFileName, file);
+        const { data: { publicUrl } } = client.storage.from('codet-img').getPublicUrl(secureFileName);
+        await client.from('backups').insert([{ image_url: publicUrl, user_id: user.id, file_name: file.name, is_public: true }]);
+        loadPhotos();
+    }
+
     function openPhoto(id) {
         client.from('backups').select('*').eq('id', id).single().then(({data}) => {
             currentPhoto = data;
@@ -176,12 +151,41 @@
     }
 
     async function triggerDownload() {
-        const response = await fetch(currentPhoto.image_url);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = currentPhoto.file_name || 'image.jpg'; a.click();
+        if(!currentPhoto) return;
+        try {
+            // 원본 파일 데이터 가져오기
+            const response = await fetch(currentPhoto.image_url);
+            const blob = await response.blob();
+            
+            // 임시 URL 생성 및 다운로드 실행
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            // DB에 저장된 원래 파일명을 사용하거나, 없으면 기본값 사용
+            a.download = currentPhoto.file_name || 'codetbase_image.jpg'; 
+            document.body.appendChild(a);
+            a.click();
+            
+            // 정리
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error("다운로드 중 오류:", error);
+            // 실패 시 최후의 수단으로 새 창 열기
+            window.open(currentPhoto.image_url, '_blank');
+        }
     }
 
+    // --- 기타 기존 로직 유지 ---
+    function initDragAndDrop() {
+        const dz = document.getElementById('drop-zone');
+        dz.onclick = () => document.getElementById('file-input').click();
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+        dz.addEventListener('dragover', () => dz.classList.add('dragover'));
+        dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+        dz.addEventListener('drop', e => { dz.classList.remove('dragover'); if (e.dataTransfer.files.length) upload(e.dataTransfer.files[0]); });
+    }
     async function deletePermanently() { if(confirm("삭제할까요?")) { await client.from('backups').delete().eq('id', currentPhoto.id); closeModal(); loadPhotos(); } }
     function showShareLink() { document.getElementById('link-container').style.display = 'block'; }
     function closeSubModals() { document.querySelectorAll('.sub-modal, .overlay').forEach(el => el.style.display = 'none'); }
